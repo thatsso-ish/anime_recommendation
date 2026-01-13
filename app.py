@@ -5,9 +5,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from surprise import Dataset, Reader
 
+import os
+
 # Load Custom CSS
 def local_css(file_name):
-    with open(file_name) as f:
+    # Construct absolute path to ensure file is found
+    file_path = os.path.join(os.path.dirname(__file__), file_name)
+    with open(file_path) as f:
         st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 local_css("style.css")
@@ -56,11 +60,11 @@ genres = sorted(genres)
 
 # Sidebar for navigation
 st.sidebar.markdown('## 🧭 Navigation')
-page = st.sidebar.radio("", ["About", "Recommendations"])
+page = st.sidebar.radio("Navigation", ["About", "Recommendations"], label_visibility="collapsed")
 
 if page == "About":
     st.markdown('<div class="main-header"><h1>🎬 Anime Recommendation System</h1></div>', unsafe_allow_html=True)
-    st.image('visuals/anime.png', use_column_width=True)
+    st.image('visuals/anime.png', use_container_width=True) # Updated parameter
     st.markdown("""
     <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
     <h3>Welcome to your next obsession! 🌟</h3>
