@@ -3,7 +3,8 @@ import pandas as pd
 import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
-from surprise import Dataset, Reader
+from surprise import Dataset, Reader, SVD
+from surprise.model_selection import cross_validate
 
 import os
 
@@ -42,6 +43,7 @@ def display_anime_cards(recommendations):
             """, unsafe_allow_html=True)
 
 # Load data
+@st.cache_data
 def load_data():
     anime = pd.read_csv('data/anime.csv')
     train = pd.read_csv('data/train.csv')
@@ -50,6 +52,18 @@ def load_data():
     return anime, ratings, train, test
 
 anime, ratings, train, test = load_data()
+
+# Train model
+@st.cache_resource
+def train_model(ratings):
+    reader = Reader(rating_scale=(1, 10))
+    data = Dataset.load_from_df(ratings[['user_id', 'anime_id', 'rating']], reader)
+    svd = SVD()
+    trainset = data.build_full_trainset()
+    svd.fit(trainset)
+    return svd
+
+svd = train_model(ratings)
 
 # Extract unique types and genres
 types = sorted(anime['type'].dropna().unique())
@@ -64,7 +78,7 @@ page = st.sidebar.radio("Navigation", ["About", "Recommendations"], label_visibi
 
 if page == "About":
     st.markdown('<div class="main-header"><h1>🎬 Anime Recommendation System</h1></div>', unsafe_allow_html=True)
-    st.image('visuals/anime.png', use_container_width=True) # Updated parameter
+    st.image('visuals/anime.png', use_container_width=True)
     st.markdown("""
     <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
     <h3>Welcome to your next obsession! 🌟</h3>
@@ -109,7 +123,10 @@ elif page == "Recommendations":
             return
         
         # Example: Using genre to recommend similar animes
+        # FIX: SettingWithCopyWarning
+        filtered_anime = filtered_anime.copy()
         filtered_anime['genre'] = filtered_anime['genre'].fillna('')
+        
         tfidf = TfidfVectorizer(stop_words='english')
         tfidf_matrix = tfidf.fit_transform(filtered_anime['genre'])
         
@@ -160,24 +177,12 @@ elif page == "Recommendations":
             st.warning("No anime found. Please adjust filters.")
             return
         
-        # Load pre-trained SVD model
-        try:
-            with open('models/svd_model.pkl', 'rb') as f:
-                svd = pickle.load(f)
-        except FileNotFoundError:
-            st.error("Model file not found. Please train the model first.")
-            return
-        
         # Check and rename columns if necessary
         if 'ID' in ratings.columns:
             ratings[['user_id', 'anime_id']] = ratings['ID'].str.split('_', expand=True)
             ratings['user_id'] = ratings['user_id'].astype(int)
             ratings['anime_id'] = ratings['anime_id'].astype(int)
 
-        # Reader for Surprise
-        reader = Reader(rating_scale=(1, 10))
-        data = Dataset.load_from_df(ratings[['user_id', 'anime_id', 'rating']], reader)
-        
         def get_recommendations(user_id, n=10):
             user_ratings = ratings[ratings['user_id'] == user_id]
             if user_ratings.empty:
