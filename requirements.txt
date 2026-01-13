@@ -2,3 +2,4 @@ streamlit
 pandas
 scikit-learn
 scikit-surprise
+numpy<2
