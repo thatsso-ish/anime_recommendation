@@ -56,8 +56,14 @@ anime, ratings, train, test = load_data()
 # Train model
 @st.cache_resource
 def train_model(ratings):
+    # Optimize: Sample data if too large to prevent 503/Timeout on free tier
+    if len(ratings) > 20000:
+        ratings_sample = ratings.sample(n=20000, random_state=42)
+    else:
+        ratings_sample = ratings
+        
     reader = Reader(rating_scale=(1, 10))
-    data = Dataset.load_from_df(ratings[['user_id', 'anime_id', 'rating']], reader)
+    data = Dataset.load_from_df(ratings_sample[['user_id', 'anime_id', 'rating']], reader)
     svd = SVD()
     trainset = data.build_full_trainset()
     svd.fit(trainset)
