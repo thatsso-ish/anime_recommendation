@@ -5,6 +5,38 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from surprise import Dataset, Reader
 
+# Load Custom CSS
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+local_css("style.css")
+
+# Helper to display anime cards
+def display_anime_cards(recommendations):
+    cols = st.columns(3)
+    for idx, row in recommendations.iterrows():
+        with cols[idx % 3]:
+            # Handle different column names if necessary (distinguished by logic)
+            name = row['name']
+            rating = row.get('rating', row.get('predicted_rating', 'N/A'))
+            # Genre might not be in the recommendations dataframe depending on proper merge
+            # If not present, we can try to fetch it from the main anime df if available globally
+            # For now, let's look for genre or default
+            genre = row.get('genre', 'Genre N/A')
+            type_ = row.get('type', 'TV')
+            
+            st.markdown(f"""
+            <div class="anime-card">
+                <div class="anime-title">{name}</div>
+                <div style="color: #ccc; font-size: 0.8rem; margin-bottom: 0.5rem;">{genre}</div>
+                <div class="anime-metric">
+                    <span class="rating-badge">⭐ {rating}</span>
+                    <span>{type_}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
 # Load data
 def load_data():
     anime = pd.read_csv('data/anime.csv')
@@ -23,44 +55,32 @@ for genre_list in anime['genre'].dropna().str.split(', '):
 genres = sorted(genres)
 
 # Sidebar for navigation
-page = st.sidebar.radio("Choose a page", ["About", "Recommendations"])
+st.sidebar.markdown('## 🧭 Navigation')
+page = st.sidebar.radio("", ["About", "Recommendations"])
 
 if page == "About":
-    st.title('About')
-    st.image('visuals/anime.png', caption='Anime Recommendation System', use_column_width=True)
-    st.write("""
-    ### Anime Recommendation System
-    
-    This Anime Recommendation System helps users discover new animes based on their preferences. The system offers two types of recommendation algorithms:
-    
-    - **Content-Based Filtering**: This algorithm recommends animes based on the genre and type of animes that a user likes. It uses the genre and type information to find similar animes.
-    
-    - **Collaborative Filtering**: This algorithm recommends animes based on the ratings given by users. It uses a collaborative approach, finding animes that similar users have liked.
-    
-    ### How It Works
-    
-    1. **Content-Based Filtering**:
-        - Users can filter animes by type and genre.
-        - Select up to 3 animes they like.
-        - The system recommends similar animes based on the selected animes.
-    
-    2. **Collaborative Filtering**:
-        - Users can filter animes by type and genre.
-        - Enter their User ID.
-        - The system recommends animes that similar users have rated highly.
-    
-    Explore the "Recommendations" page to start finding your next favorite anime!
-    """)
+    st.markdown('<div class="main-header"><h1>🎬 Anime Recommendation System</h1></div>', unsafe_allow_html=True)
+    st.image('visuals/anime.png', use_column_width=True)
+    st.markdown("""
+    <div style="background: rgba(255,255,255,0.05); padding: 20px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.1);">
+    <h3>Welcome to your next obsession! 🌟</h3>
+    <p>Discover new anime tailored just for you using our state-of-the-art recommendation algorithms.</p>
+    <ul>
+        <li><strong>🧠 Content-Based</strong>: Finds show similar to what you love.</li>
+        <li><strong>🤝 Collaborative</strong>: Suggests hits based on community taste.</li>
+    </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
 elif page == "Recommendations":
-    st.title('Anime Recommendation System')
+    st.markdown('<div class="main-header"><h1>🔍 Find Your Next Watch</h1></div>', unsafe_allow_html=True)
 
     # Algorithm selection
     algorithm = st.selectbox('Select Algorithm', ('Content-Based Filtering', 'Collaborative Filtering'))
 
     # Implement the chosen algorithm
     def content_based_filtering(anime):
-        st.write("Content-Based Filtering is selected.")
+        st.info("💡 **Content-Based Filtering**: Suggests anime based on similarity of genres and types.")
         
         # User can filter by types
         selected_types = st.multiselect('Select types to filter by', types, default=types)
@@ -81,7 +101,7 @@ elif page == "Recommendations":
         filtered_anime = filter_by_genres(filtered_anime_by_type, selected_genres)
         
         if filtered_anime.empty:
-            st.write("No anime found for the selected types and genres. Please select different filters.")
+            st.warning("No anime found for the selected types and genres. Please adjust your filters.")
             return
         
         # Example: Using genre to recommend similar animes
@@ -98,27 +118,21 @@ elif page == "Recommendations":
             sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
             sim_scores = sim_scores[1:num_recommendations+1]
             anime_indices = [i[0] for i in sim_scores]
-            return filtered_anime[['name', 'rating']].iloc[anime_indices]
+            return filtered_anime[['name', 'rating', 'genre', 'type']].iloc[anime_indices]
 
         # User can select between 1 to 3 animes
-        selected_animes = st.multiselect('Select up to 3 animes to get recommendations', filtered_anime['name'].values, default=filtered_anime['name'].values[:1])
+        selected_animes = st.multiselect('Select up to 3 animes you like:', filtered_anime['name'].values, default=filtered_anime['name'].values[:1])
         
         # Slider to select number of recommendations
         num_recommendations = st.slider('Number of recommendations', min_value=1, max_value=30, value=10)
         
-        if st.button('Recommend'):
+        if st.button('🚀 Recommend'):
             recommendations = get_recommendations(selected_animes, num_recommendations)
-            st.write('Recommended Animes:')
-            
-            # Display recommendations in tabular format
-            st.table(pd.DataFrame({
-                'Rank': range(1, len(recommendations) + 1),
-                'Anime Title': recommendations['name'],
-                'Rating / 10': recommendations['rating'].round(2)
-            }))
+            st.subheader('🌟 Top Picks for You:')
+            display_anime_cards(recommendations)
 
     def collaborative_filtering(ratings, anime):
-        st.write("Collaborative Filtering is selected.")
+        st.info("🤝 **Collaborative Filtering**: Suggests anime based on what users like you enjoyed.")
         
         # User can filter by types
         selected_types = st.multiselect('Select types to filter by', types, default=types)
@@ -139,12 +153,16 @@ elif page == "Recommendations":
         filtered_anime = filter_by_genres(filtered_anime_by_type, selected_genres)
         
         if filtered_anime.empty:
-            st.write("No anime found for the selected types and genres. Please select different filters.")
+            st.warning("No anime found. Please adjust filters.")
             return
         
         # Load pre-trained SVD model
-        with open('models/svd_model.pkl', 'rb') as f:
-            svd = pickle.load(f)
+        try:
+            with open('models/svd_model.pkl', 'rb') as f:
+                svd = pickle.load(f)
+        except FileNotFoundError:
+            st.error("Model file not found. Please train the model first.")
+            return
         
         # Check and rename columns if necessary
         if 'ID' in ratings.columns:
@@ -156,15 +174,11 @@ elif page == "Recommendations":
         reader = Reader(rating_scale=(1, 10))
         data = Dataset.load_from_df(ratings[['user_id', 'anime_id', 'rating']], reader)
         
-        # Predict ratings for a specific user and recommend top animes
-        user_id = st.number_input('Enter User ID', min_value=1, max_value=ratings['user_id'].max())
-        if st.button('Recommend'):
+        def get_recommendations(user_id, n=10):
             user_ratings = ratings[ratings['user_id'] == user_id]
             if user_ratings.empty:
-                st.write("No ratings found for this user.")
-                return
+                return pd.DataFrame() # Return empty if no ratings for user
             
-            # Get all animes not rated by the user
             all_anime_ids = set(filtered_anime['anime_id'])
             rated_anime_ids = set(user_ratings['anime_id'])
             unrated_anime_ids = all_anime_ids - rated_anime_ids
@@ -178,13 +192,17 @@ elif page == "Recommendations":
             
             recommended_animes['predicted_rating'] = recommended_animes['predicted_rating'].round(2)
             
-            # Display recommendations in tabular format
-            st.write('Recommended Animes:')
-            st.table(pd.DataFrame({
-                'Rank': range(1, len(recommended_animes) + 1),
-                'Anime Title': recommended_animes['name'].values,
-                'Predicted Rating': recommended_animes['predicted_rating'].values
-            }))
+            return recommended_animes
+
+        # Predict ratings for a specific user and recommend top animes
+        user_id = st.number_input('Enter User ID', min_value=1, max_value=int(ratings['user_id'].max()) if not ratings.empty else 1)
+        if st.button('🚀 Recommend'):
+            recs = get_recommendations(user_id)
+            if recs.empty:
+                st.warning("User has no ratings or doesn't exist.")
+            else:
+                st.subheader('🌟 Top Picks for You:')
+                display_anime_cards(recs)
 
     # Show results based on selected algorithm
     if algorithm == 'Content-Based Filtering':
