@@ -8,9 +8,9 @@ from surprise import Dataset, Reader
 # Load data
 def load_data():
     anime = pd.read_csv('data/anime.csv')
-    ratings = pd.read_csv('data/ratings.csv')
     train = pd.read_csv('data/train.csv')
     test = pd.read_csv('data/test.csv')
+    ratings = pd.concat([train, test], ignore_index=True)
     return anime, ratings, train, test
 
 anime, ratings, train, test = load_data()
